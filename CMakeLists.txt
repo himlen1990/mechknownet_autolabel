@@ -162,8 +162,20 @@ CATKIN_DEPENDS roscpp message_runtime
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(function_demonstration src/function_demonstration.cpp)
-target_link_libraries(function_demonstration ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+add_executable(function_demonstration_activated src/function_demonstration_activated.cpp)
+target_link_libraries(function_demonstration_activated ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
 
-add_executable(trajectory_demonstration src/trajectory_demonstration.cpp)
-target_link_libraries(trajectory_demonstration ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+add_executable(function_demonstration_associated src/function_demonstration_associated.cpp)
+target_link_libraries(function_demonstration_associated ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+
+#add_executable(trajectory_demonstration src/trajectory_demonstration.cpp)
+#target_link_libraries(trajectory_demonstration ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+
+add_executable(trajectory_demonstration_tabletop src/trajectory_demonstration_tabletop.cpp)
+target_link_libraries(trajectory_demonstration_tabletop ${OpenCV_LIBS} ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+
+add_executable(coordinate_converter src/coordinate_converter.cpp)
+target_link_libraries(coordinate_converter ${PCL_LIBRARIES}  ${catkin_LIBRARIES})
+
+#add_executable(grasping_demonstration src/grasping_demonstration.cpp)
+#target_link_libraries(grasping_demonstration ${PCL_LIBRARIES}  ${catkin_LIBRARIES})

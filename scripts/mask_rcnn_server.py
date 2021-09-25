@@ -31,8 +31,8 @@ class mask_rcnn_server:
             log_file = mrcnn_dir + "/log/610objects"
             self.num_class = 1 + 8
         else:
-            meta_file = mrcnn_dir + "/log_traj/610objects.meta"
-            log_file = mrcnn_dir + "/log_traj/610objects"
+            meta_file = mrcnn_dir + "/log_saw_eyeglass_1016/610objects.meta"
+            log_file = mrcnn_dir + "/log_saw_eyeglass_1016/610objects"
             self.num_class = 1 + 2
         self.loader = tf.train.import_meta_graph(meta_file)
         self.sess = tf.Session()

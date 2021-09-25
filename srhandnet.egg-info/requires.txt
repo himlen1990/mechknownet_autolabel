@@ -1,0 +1,6 @@
+extendedos
+gdown
+matplotlib
+numpy
+opencv-python
+torch

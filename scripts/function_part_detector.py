@@ -35,7 +35,7 @@ class finger_detector:
     self.depth_sub = message_filters.Subscriber("/hsrb/head_rgbd_sensor/depth_registered/image", Image)
     self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 0.1)
     self.ts.registerCallback(self.callback)
-    self.fingertip_pub = rospy.Publisher("/mechknownet/fingertip",PointStamped,queue_size=5)
+    self.fingertip_pub = rospy.Publisher("/mechknownet/fingertip",PointStamped,queue_size=1)
     self.signal_pub = rospy.Publisher("/mechknownet/control_signal",String,queue_size=1)
 
     device = torch.device('cpu')
@@ -47,6 +47,7 @@ class finger_detector:
     self.holding_hand_pos = Point(-1000,-1000,-1000)
     self.timer_start = 0
     self.crop_object_flag = False
+    self.pre_index_finger_point = (-1,-1)
 
 
   def cam_info_callback(self, msg):
@@ -62,7 +63,6 @@ class finger_detector:
       x = (u - self.cx) * z * self.invfx
       y = (v - self.cy) * z * self.invfy
       return x,y
-
       
 
   def callback(self,rgb, depth):
@@ -83,7 +83,7 @@ class finger_detector:
     my_frame = frame.copy()
     for keypoint in keypoints:
         finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
-        cv2.circle(my_frame,finger_point,3,(255,0,0),3)
+        cv2.circle(my_frame,finger_point,3,(0,255,0),3)
     cv2.imshow("123",my_frame)      
 
     if not self.crop_object_flag and len(keypoints)> 10 and len(handrect)==1: #for handheld object detection
@@ -96,10 +96,10 @@ class finger_detector:
       mid_z = all_z[int(len(all_z)/2)]
       print "mid",mid_z
 
-      
+      # format of a keypoint is [number of hands(start from 0), joint, probability, (x,y)]
       for keypoint in keypoints:        
-        if keypoint[1] == 7: #index fingertip
-          finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
+        if keypoint[1] == 7: #index fingertip  
+          finger_point = [int(keypoint[3][1]),int(keypoint[3][0])]
           if not math.isnan(mid_z):
             nx,ny = self.unproject(finger_point[0],finger_point[1],mid_z)
             msg = PointStamped()
@@ -111,60 +111,84 @@ class finger_detector:
               self.fingertip_prepos = Point(nx,ny,mid_z)
             else:
               dis = abs(mid_z-self.fingertip_prepos.z)
-              #dis = math.sqrt(abs(nx-self.fingertip_prepos.x)**2 + abs(ny-self.fingertip_prepos.y)**2 + abs(mid_z-self.fingertip_prepos.z)**2)
-              print dis
-              if dis > 0.03:
+              dis2 = math.sqrt(abs(nx-self.fingertip_prepos.x)**2 + abs(ny-self.fingertip_prepos.y)**2 + abs(mid_z-self.fingertip_prepos.z)**2)
+              print "dis2:", dis2
+              if dis2 > 0.03:
                 self.fingertip_prepos = Point(nx,ny,mid_z)
-              if dis < 0.015 and self.timer_start==0:
+              if dis2 < 0.018 and self.timer_start==0:
                 self.timer_start = rospy.Time.now().to_sec()
-              if dis < 0.015 and rospy.Time.now().to_sec()-self.timer_start>3.0:
+              if dis2 < 0.018 and rospy.Time.now().to_sec()-self.timer_start>3.0:
                 signal_str = String("get_object")
                 self.signal_pub.publish(signal_str)
                 self.holding_hand_pos = msg.point
                 self.crop_object_flag = True
-                print "now!!!!!!!!!"
-
+                print "stable!!!!!!!!!"
+                self.timer_start = 0 #reset timer
 
     if self.crop_object_flag and len(handrect)==2 and len(keypoints)> 20: #point out function part
-      all_z2 = []
-      #all_z1 = []
+      all_z = []
       for keypoint in keypoints:
-        '''
-        if keypoint[0] == 0:
-          finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
-          z = depth_image[finger_point[1]][finger_point[0]]
-          all_z1.append(z)
-        '''
         if keypoint[0] == 1:
-          finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
-          z = depth_image[finger_point[1]][finger_point[0]]
-          all_z2.append(z)
+          finger_point = [int(keypoint[3][1]),int(keypoint[3][0])]
+          if finger_point[1] > 479:
+            finger_point[1] = 479
+          if finger_point[0] > 479:
+            finger_point[0] = 479
 
-      #np.sort(all_z1)
-      #mid_z1 = all_z1[int(len(all_z1)/2)]
-      np.sort(all_z2)
-      mid_z2 = all_z2[int(len(all_z2)/2)]
+          z = depth_image[finger_point[1]][finger_point[0]]
+          all_z.append(z)
+
+      np.sort(all_z)
+      mid_z = all_z[int(len(all_z)/2)]
 
       for keypoint in keypoints:
         if keypoint[0] == 1:
           if keypoint[1] == 7 or keypoint[1] == 6: #index fingertip
-            finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
-            print "!!!!!!!"
-            print mid_z2
-            if not math.isnan(mid_z2):
-              nx,ny = self.unproject(finger_point[0],finger_point[1],mid_z2)
-              msg = PointStamped()
-              msg.header = depth.header
-              msg.header.stamp = rospy.Time.now()
-              msg.point = Point(nx,ny,mid_z2)
-              self.fingertip_pub.publish(msg)
+            finger_point = [int(keypoint[3][1]),int(keypoint[3][0])]
+            if not math.isnan(mid_z):
+              nx,ny = self.unproject(finger_point[0],finger_point[1],mid_z)
+              dis_to_holding_hand = math.sqrt(abs(nx-self.holding_hand_pos.x)**2 + abs(ny-self.holding_hand_pos.y)**2 + abs(mid_z-self.holding_hand_pos.z)**2)
+              if dis_to_holding_hand>0.05:
+                print "!!!!!!!"
+                print "2hand"
+                print dis_to_holding_hand
+                msg = PointStamped()
+                msg.header = depth.header
+                msg.header.stamp = rospy.Time.now()
+                msg.point = Point(nx,ny,mid_z)
+                self.fingertip_pub.publish(msg)
+
+                if keypoint[1] == 7:
+                  print finger_point
+                  if self.pre_index_finger_point[0] == -1:
+                    self.pre_index_finger_point = finger_point
+                  if self.pre_index_finger_point[0] != -1:
+                    changes = abs(finger_point[0]-self.pre_index_finger_point[0]) + abs(finger_point[1]-self.pre_index_finger_point[1])
+                    self.pre_index_finger_point = finger_point
+                    print changes
+                    if self.timer_start == 0:
+                      self.timer_start = rospy.Time.now().to_sec()
+                    if changes > 5:
+                      self.timer_start = rospy.Time.now().to_sec()
+                    if changes < 5 and rospy.Time.now().to_sec()-self.timer_start>3.0:
+                      signal_str = String("finish")
+                      self.signal_pub.publish(signal_str)
+                      print "finish"
+
+
 
     if self.crop_object_flag and len(handrect)==1 and len(keypoints)> 10: #point out function part
       all_z = []
       for keypoint in keypoints:
-        finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
+        finger_point = [int(keypoint[3][1]),int(keypoint[3][0])]
+        if finger_point[1] > 479:
+          finger_point[1] = 479
+        if finger_point[0] > 479:
+          finger_point[0] = 479
+
         z = depth_image[finger_point[1]][finger_point[0]]
         all_z.append(z)
+
       np.sort(all_z)
       mid_z = all_z[int(len(all_z)/2)]
 
@@ -173,22 +197,37 @@ class finger_detector:
           finger_point = (int(keypoint[3][1]),int(keypoint[3][0]))
           if not math.isnan(mid_z):
             nx,ny = self.unproject(finger_point[0],finger_point[1],mid_z)
-            dis = math.sqrt(abs(nx-self.holding_hand_pos.x)**2 + abs(ny-self.holding_hand_pos.y)**2 + abs(mid_z-self.holding_hand_pos.z)**2)
+            dis_to_holding_hand = math.sqrt(abs(nx-self.holding_hand_pos.x)**2 + abs(ny-self.holding_hand_pos.y)**2 + abs(mid_z-self.holding_hand_pos.z)**2)
 
-            if dis>0.05:
+            if dis_to_holding_hand>0.05:
               print "send"
-              print mid_z
+              print dis_to_holding_hand
               msg = PointStamped()
               msg.header = depth.header
               msg.header.stamp = rospy.Time.now()
               msg.point = Point(nx,ny,mid_z)
               self.fingertip_pub.publish(msg)
+              
 
-
-
+              if keypoint[1] == 7:
+                if self.pre_index_finger_point[0] == -1:
+                  self.pre_index_finger_point = finger_point
+                if self.pre_index_finger_point[0] != -1:
+                  changes = abs(finger_point[0]-self.pre_index_finger_point[0]) + abs(finger_point[1]-self.pre_index_finger_point[1])
+                  self.pre_index_finger_point = finger_point
+                  print changes
+                  if self.timer_start == 0:
+                    self.timer_start = rospy.Time.now().to_sec()
+                  if changes > 5:
+                    self.timer_start = rospy.Time.now().to_sec()
+                  if changes < 5 and rospy.Time.now().to_sec()-self.timer_start>3.0:
+                    signal_str = String("finish")
+                    self.signal_pub.publish(signal_str)
+                    print "finish"
+                  
 
     k = cv2.waitKey(3) & 0xFF      
-    cv2.imshow("Image window", rgb_image)
+    #cv2.imshow("Image window", rgb_image)
 
 
 

@@ -1,0 +1,25 @@
+Metadata-Version: 1.1
+Name: srhandnet
+Version: 0.0.1
+Summary: A python library
+Home-page: https://github.com/iory/srhandnet
+Author: iory
+Author-email: ab.ioryz@gmail.com
+License: MIT
+Description-Content-Type: text/markdown
+Description: # srhandnet
+        pip install torch
+        pip install -e .
+        
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Natural Language :: English
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: Implementation :: CPython
